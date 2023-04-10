@@ -1,0 +1,182 @@
+---
+title: "STATS PROJECT"
+author: "William Jones"
+date: "2023-04-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#Data PreProccesing
+```{r}
+library(Hmisc)
+test = read.csv("C:/Users/bhand/OneDrive/Desktop/Statistics Data Science/kaggle/test.csv")
+train = read.csv("C:/Users/bhand/OneDrive/Desktop/Statistics Data Science/kaggle/train.csv")
+
+#Converting Categorical Variables to Factors
+train[c(3,6:17,22:26,28:34,36,40:43,54,56,58,59,61,64:66,73:75,79:80)]  <-lapply(train[c(3,6:17,22:26,28:34,36,40:43,54,56,58,59,61,64:66,73:75,79:80)],as.factor)
+
+test[c(3,6:17,22:26,28:34,36,40:43,54,56,58,59,61,64:66,73:75,79:80)]  <-lapply(test[c(3,6:17,22:26,28:34,36,40:43,54,56,58,59,61,64:66,73:75,79:80)],as.factor)
+
+#Converting all categorical variables to numeric
+train[, c(3,6:17,22:26,28:34,36,40:43,54,56,58,59,61,64:66,73:75,79:80)] <- sapply(train[, c(3,6:17,22:26,28:34,36,40:43,54,56,58,59,61,64:66,73:75,79:80)], unclass)
+
+test[, c(3,6:17,22:26,28:34,36,40:43,54,56,58,59,61,64:66,73:75,79:80)] <- sapply(test[, c(3,6:17,22:26,28:34,36,40:43,54,56,58,59,61,64:66,73:75,79:80)], unclass)
+#adding 0 for NA
+train[is.na(train)] = 0
+#adding 0 for NA
+test[is.na(test)] = 0
+
+```
+#Inital Analysis of correlations from the Train Data
+```{r}
+library(ggplot2)
+library(lattice)
+
+#create a correlation matrix rounding to two decimals
+corr_matrix <- round(cor(train[,sapply(train,is.numeric)]),2)
+
+
+library(reshape2)
+
+red_cor <- na.omit(melt(corr_matrix))
+#making a correlation matrix plot
+ggplot(data = red_cor, aes(x=Var1, y=Var2, fill=value)) + geom_tile() + theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))
+red_cor
+
+#Seeing the distribution of the response variable
+plot(train$SalePrice)
+
+#dropping all the rows that have a sale price above 500,000
+train<- train[!(train$SalePrice > 500000),]
+#dropping rows that lot areas are above 10000
+train <-train[!(train$LotArea > 10000),]
+#dropping all houses built in the 1800s
+train <- train[!(train$YearBuilt < 1900),]
+
+plot(train$SalePrice)
+#there does seem to be much need for this column so it will be dropped in the custom model
+plot(train$PoolQC)
+```
+
+#Stepwise Regression using Forward and Backward
+```{r}
+library(tidyverse)
+library(caret)
+library(leaps)
+library(MASS)
+#model with only intercept
+inter.model <- lm(formula = SalePrice ~ 1, data = train)
+#model with all variables
+full.model <- lm(formula = SalePrice~.-SalePrice, data = train)
+
+#stepwise regression model
+step.model <- stepAIC(inter.model, scope = list(upper = full.model, lower = inter.model), direction = "both", trace = FALSE)
+#summary of the model
+summary(step.model)
+#test case prediction from step wise model
+prediction <- as.data.frame(predict(step.model, test))
+#renaming column to SalePrice
+colnames(prediction) <- c( 'SalePrice')
+#Create ID column
+prediction$ID = test$Id
+#printing out the predicted test case
+write.csv(prediction, "C:/Users/bhand/OneDrive/Desktop/Statistics Data Science/kaggle/stepwise.csv", row.names = FALSE)
+
+library(forecast)
+#plotting all the plots for assumptions
+plot(step.model)
+#CV output with AIC, and Adj R2
+CV(step.model)
+```
+#Forward Regression 
+```{r}
+#stepwise regression model
+forward.model <- stepAIC(inter.model, scope = list(upper = full.model, lower = inter.model), direction = "forward", trace = FALSE)
+#summary of the model
+summary(forward.model)
+#test case prediction from step wise model
+prediction <- as.data.frame(predict(forward.model, test))
+#renaming column to SalePrice
+colnames(prediction) <- c( 'SalePrice')
+#Create ID column
+prediction$ID = test$Id
+#Printing out prediction
+write.csv(prediction, "C:/Users/bhand/OneDrive/Desktop/Statistics Data Science/kaggle/forward.csv", row.names = FALSE)
+#Printing out model Assumption
+plot(forward.model)
+#Printing out the CV
+CV(forward.model)
+```
+#Backward Regression
+```{r}
+#backward regression model
+
+full.model<- lm(SalePrice~., data = train)
+inter.model <- lm(SalePrice ~ 1, data = train)
+backward.model <- stepAIC(full.model, scope = list(upper= full.model, lower = inter.model), direction = "backward", trace = FALSE)
+#summary of the model
+summary(backward.model)
+#test case prediction from backward model
+prediction <- as.data.frame(predict(backward.model, test))
+#renaming column to SalePrice
+colnames(prediction) <- c( 'SalePrice')
+#prediction$SalePrice <- 10^(prediction$SalePrice)
+#Create ID column
+prediction$ID = test$Id
+#Printing out Prediction 
+write.csv(prediction, "C:/Users/bhand/OneDrive/Desktop/Statistics Data Science/kaggle/backward.csv", row.names = FALSE)
+#Printing out the CV score
+CV(custom.model)
+#Plotting the residual model
+plot(fitted(backward.model), resid(backward.model))
+abline(0, 0)
+
+#qq plot of the regression and CooksD
+plot(backward.model)
+
+```
+#Custom Regression
+```{r}
+#stepwise regression model
+plot(train$Condition2)
+temp.model <- lm(formula = SalePrice ~ OverallQual + GrLivArea +
+                   ExterQual + GarageCars + MSSubClass +
+                   KitchenQual + YearBuilt + OverallCond + LotArea +
+                   BsmtQual + TotalBsmtSF +
+                   MasVnrArea + Fireplaces + SaleCondition + RoofMatl +
+                   Functional + MasVnrType + WoodDeckSF + ScreenPorch +
+                   BsmtFullBath + BsmtCond + BsmtExposure + KitchenAbvGr +
+                   TotRmsAbvGrd + BedroomAbvGr + Street + GarageYrBlt +
+                   LowQualFinSF + Exterior1st, data = train)
+#Full model with interactions
+full.model<- lm(SalePrice~., data = train)
+#model with only intercepts
+inter.model <- lm(SalePrice ~ 1, data = train)
+#custom model with stepwise
+custom.model <- stepAIC(temp.model, scope = list(upper= temp.model, lower = inter.model), direction = "both", trace = FALSE)
+#summary of the model
+summary(custom.model)
+#test case prediction from step wise model
+prediction <- as.data.frame(predict(custom.model, test))
+#renaming column to SalePrice
+colnames(prediction) <- c( 'SalePrice')
+#prediction$SalePrice <- 10^(prediction$SalePrice)
+#Create ID column
+prediction$ID = test$Id
+#Print out of predictions
+write.csv(prediction, "C:/Users/bhand/OneDrive/Desktop/Statistics Data Science/kaggle/custom.csv", row.names = FALSE)
+#CV Score
+CV(custom.model)
+#residual plot
+plot(fitted(custom.model), resid(custom.model))
+abline(0, 0)
+
+#Plot of residuals and Cooks D
+plot(custom.model)
+
+```
+
+
+
