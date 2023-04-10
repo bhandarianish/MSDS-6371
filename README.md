@@ -29,7 +29,10 @@ Author: Anish Bhandari and William Jones
 https://bhandarianish.shinyapps.io/kaggle/
  
 
-- profile
+- profile1
 https://bhandarianish.github.io 
 
-      https://willjones11.github.io/
+- profile2
+https://willjones11.github.io/
+
+      
