@@ -20,7 +20,7 @@ Author: Anish Bhandari and William Jones
 - `forward.csv` Sales Price Prediction for Forward Regression
 - `stepwise.csv` Sales Price Prediction for Stepwise Regression
 - `README.md` describes structure of the repository
-- `train3.csv` Filtered dataset for Rshiny App
+- `trainw3.csv` Filtered dataset for Rshiny App
 - `app.R`  R code for RShiny 
 
 
